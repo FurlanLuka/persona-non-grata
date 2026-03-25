@@ -9,7 +9,6 @@
   let hideNoise = false;
   let showStats = false;
   let isFiltering = false;
-  let fiberWarned = false;
 
   const HIDDEN_ATTR = "data-png-hidden";
   const COUNTER_ID = "png-hidden-counter";
@@ -18,55 +17,6 @@
   function getAuthorFromElement(el) {
     const authorEl = el.querySelector("a.author");
     if (authorEl) return authorEl.textContent.trim().toLowerCase();
-
-    const activityHeader = el.querySelector('[class*="ActivityHeader"]');
-    if (activityHeader) {
-      const link = activityHeader.querySelector('a[href^="/"]');
-      if (link) {
-        return link.textContent.trim().toLowerCase().replace(/\[bot\]$/, "");
-      }
-    }
-
-    return getAuthorFromReactFiber(el);
-  }
-
-  function getAuthorFromReactFiber(el) {
-    try {
-      const target =
-        el.querySelector('[class*="ResolvableContainer"]') ||
-        el.querySelector('[class*="ReviewThreadContainer"]') ||
-        el;
-
-      const fiberKey = Object.keys(target).find(
-        (k) =>
-          k.startsWith("__reactFiber") ||
-          k.startsWith("__reactInternalInstance")
-      );
-      if (!fiberKey) return null;
-
-      let fiber = target[fiberKey];
-      for (let i = 0; i < 10; i++) {
-        if (!fiber) break;
-        const props = fiber.memoizedProps || {};
-
-        if (props.thread?.commentsData?.comments?.[0]?.author?.login) {
-          return props.thread.commentsData.comments[0].author.login
-            .toLowerCase()
-            .replace(/\[bot\]$/, "");
-        }
-
-        fiber = fiber.return;
-      }
-    } catch (err) {
-      if (!fiberWarned) {
-        fiberWarned = true;
-        console.warn(
-          "[Persona Non Grata] React fiber structure changed — inline thread filtering on Files tab may not work.",
-          err.message
-        );
-      }
-    }
-
     return null;
   }
 
@@ -214,9 +164,6 @@
       }
     }
 
-    // 3. Filter Files Changed tab
-    hiddenCount += filterFilesTabComments(stats);
-
     updateCounter(hiddenCount);
 
     if (showStats) {
@@ -224,63 +171,6 @@
     } else {
       removeStatsBox();
     }
-  }
-
-  function filterFilesTabComments(stats) {
-    let count = 0;
-
-    const classicComments = document.querySelectorAll(
-      ".review-comment, .js-inline-comment-fragment"
-    );
-    for (const comment of classicComments) {
-      const author = getAuthorFromElement(comment);
-      if (isBlocked(author)) {
-        hideElement(comment);
-        count++;
-        recordHidden(stats, author, false);
-      } else {
-        showElement(comment);
-      }
-    }
-
-    const markers = document.querySelectorAll(
-      '[class*="InlineMarkers-module__markersWrapper"]'
-    );
-    for (const marker of markers) {
-      const threads = marker.querySelectorAll(
-        '[class*="InlineReviewThread-module__ReviewThreadContainer"]'
-      );
-      if (threads.length === 0) continue;
-
-      let allBlocked = true;
-      let hasUnresolved = false;
-      for (const thread of threads) {
-        const author = getAuthorFromElement(thread);
-        if (author === null) {
-          // Fiber data not ready yet — don't hide, don't count as visible
-          hasUnresolved = true;
-          continue;
-        }
-        if (isBlocked(author)) {
-          hideElement(thread);
-          count++;
-          stats.threadsHidden++;
-          recordHidden(stats, author, false);
-        } else {
-          showElement(thread);
-          allBlocked = false;
-        }
-      }
-
-      // Only hide the whole marker if ALL threads resolved and ALL are blocked
-      if (allBlocked && !hasUnresolved) {
-        hideElement(marker);
-      } else {
-        showElement(marker);
-      }
-    }
-
-    return count;
   }
 
   // --- Stats box ---
@@ -300,7 +190,6 @@
       box = document.createElement("div");
       box.id = STATS_ID;
 
-      // Insert after the first RAILS-PARTIAL (PR description) or at the top
       const firstChild = discussion.firstElementChild;
       if (firstChild?.nextElementSibling) {
         firstChild.after(box);
@@ -309,7 +198,6 @@
       }
     }
 
-    // Use GitHub's CSS custom properties for native theme support
     const cs = getComputedStyle(document.documentElement);
     const v = (name) => cs.getPropertyValue(name).trim();
 
@@ -349,7 +237,6 @@
       .filter(Boolean)
       .join('<span style="opacity:0.4;"> · </span>');
 
-    // Match the timeline layout: same left margin as timeline comment boxes
     box.innerHTML =
       `<div class="TimelineItem" style="padding:0;margin:0 0 16px;">` +
       `<div class="TimelineItem-body my-0" style="` +
