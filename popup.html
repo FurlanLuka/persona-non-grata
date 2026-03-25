@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Persona Non Grata</h1>
+    <p class="subtitle">Hide GitHub PR comments from these users</p>
+
+    <form id="add-form">
+      <input
+        type="text"
+        id="username-input"
+        placeholder="GitHub username"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="39"
+      >
+      <button type="submit">Add</button>
+    </form>
+    <p id="error-msg" class="error-msg" hidden></p>
+
+    <ul id="user-list"></ul>
+
+    <div id="empty-state" class="empty-state">
+      No users blocked yet. Add a GitHub username above.
+    </div>
+
+    <div class="footer">
+      <div class="toggle-group">
+        <label class="toggle">
+          <input type="checkbox" id="enabled-toggle" checked>
+          <span>Filtering enabled</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="noise-toggle">
+          <span>Hide noise (commits, status events)</span>
+        </label>
+      </div>
+      <button id="refresh-btn" class="btn-secondary" title="Re-filter current tab">Refresh</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
