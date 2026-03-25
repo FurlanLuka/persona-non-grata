@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background: rounded square -->
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="#1C1C1E"/>
+
+  <!-- Person silhouette (simplified) -->
+  <!-- Head -->
+  <circle cx="64" cy="42" r="14" fill="#8B8B8E"/>
+  <!-- Body/shoulders -->
+  <path d="M36 88 C36 68 48 60 64 60 C80 60 92 68 92 88" fill="#8B8B8E"/>
+
+  <!-- Ban circle (red/coral) -->
+  <circle cx="64" cy="64" r="38" fill="none" stroke="#F85149" stroke-width="8"/>
+  <!-- Ban diagonal line -->
+  <line x1="37" y1="37" x2="91" y2="91" stroke="#F85149" stroke-width="8" stroke-linecap="round"/>
+</svg>
