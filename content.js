@@ -253,8 +253,14 @@
       if (threads.length === 0) continue;
 
       let allBlocked = true;
+      let hasUnresolved = false;
       for (const thread of threads) {
         const author = getAuthorFromElement(thread);
+        if (author === null) {
+          // Fiber data not ready yet — don't hide, don't count as visible
+          hasUnresolved = true;
+          continue;
+        }
         if (isBlocked(author)) {
           hideElement(thread);
           count++;
@@ -266,7 +272,8 @@
         }
       }
 
-      if (allBlocked) {
+      // Only hide the whole marker if ALL threads resolved and ALL are blocked
+      if (allBlocked && !hasUnresolved) {
         hideElement(marker);
       } else {
         showElement(marker);
