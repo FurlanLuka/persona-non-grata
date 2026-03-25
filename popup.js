@@ -9,6 +9,7 @@ const userList = document.getElementById("user-list");
 const emptyState = document.getElementById("empty-state");
 const enabledToggle = document.getElementById("enabled-toggle");
 const noiseToggle = document.getElementById("noise-toggle");
+const statsToggle = document.getElementById("stats-toggle");
 const refreshBtn = document.getElementById("refresh-btn");
 const errorMsg = document.getElementById("error-msg");
 
@@ -42,15 +43,17 @@ function showError(msg) {
 }
 
 async function loadState() {
-  const { blockedUsers = [], filteringEnabled = true, hideNoise = false } =
+  const { blockedUsers = [], filteringEnabled = true, hideNoise = false, showStats = false } =
     await chrome.storage.sync.get([
       "blockedUsers",
       "filteringEnabled",
       "hideNoise",
+      "showStats",
     ]);
   render(blockedUsers);
   enabledToggle.checked = filteringEnabled;
   noiseToggle.checked = hideNoise;
+  statsToggle.checked = showStats;
 }
 
 async function addUser(username) {
@@ -105,6 +108,10 @@ enabledToggle.addEventListener("change", async () => {
 
 noiseToggle.addEventListener("change", async () => {
   await chrome.storage.sync.set({ hideNoise: noiseToggle.checked });
+});
+
+statsToggle.addEventListener("change", async () => {
+  await chrome.storage.sync.set({ showStats: statsToggle.checked });
 });
 
 refreshBtn.addEventListener("click", () => {

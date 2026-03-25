@@ -7,28 +7,26 @@
   let blockedUsers = [];
   let filteringEnabled = true;
   let hideNoise = false;
+  let showStats = false;
   let isFiltering = false;
   let fiberWarned = false;
 
   const HIDDEN_ATTR = "data-png-hidden";
   const COUNTER_ID = "png-hidden-counter";
+  const STATS_ID = "png-stats-box";
 
   function getAuthorFromElement(el) {
-    // Classic GitHub view: <a class="author">username</a>
     const authorEl = el.querySelector("a.author");
     if (authorEl) return authorEl.textContent.trim().toLowerCase();
 
-    // React Files Changed view: author link inside ActivityHeader
     const activityHeader = el.querySelector('[class*="ActivityHeader"]');
     if (activityHeader) {
       const link = activityHeader.querySelector('a[href^="/"]');
       if (link) {
-        const name = link.textContent.trim().toLowerCase();
-        return name.replace(/\[bot\]$/, "");
+        return link.textContent.trim().toLowerCase().replace(/\[bot\]$/, "");
       }
     }
 
-    // React fiber: collapsed inline review threads store author in fiber props
     return getAuthorFromReactFiber(el);
   }
 
@@ -96,19 +94,11 @@
     const text = item.innerText?.substring(0, 300)?.trim() || "";
     const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
-    // Any commit-related items (individual or grouped)
     if (hasCommitIcon) return true;
-
-    // Draft toggle: "marked this pull request as draft/ready for review"
     if (text.includes("marked this pull request as")) return true;
-
-    // Title changes
     if (text.includes("changed the title")) return true;
-
-    // Cross-references: "mentioned this pull request"
     if (text.includes("mentioned this pull request")) return true;
 
-    // "requested review from" without approval/changes
     if (
       text.includes("requested review from") &&
       !text.includes("approved") &&
@@ -120,10 +110,8 @@
       if (!hasReviewContent) return true;
     }
 
-    // Changed base branch
     if (text.includes("changed the base branch")) return true;
 
-    // Resolved/minimized comment placeholders with no visible content
     if (
       text.includes("This comment was marked as resolved") &&
       text.includes("Show comment") &&
@@ -134,6 +122,28 @@
 
     return false;
   }
+
+  // --- Stats ---
+
+  function createStats() {
+    return {
+      totalItems: 0,
+      hiddenByUser: {},
+      noiseHidden: 0,
+      threadsHidden: 0,
+      visible: 0,
+    };
+  }
+
+  function recordHidden(stats, author, isNoise) {
+    if (isNoise) {
+      stats.noiseHidden++;
+    } else if (author) {
+      stats.hiddenByUser[author] = (stats.hiddenByUser[author] || 0) + 1;
+    }
+  }
+
+  // --- Filtering ---
 
   function filterTimeline() {
     if (isFiltering) return;
@@ -148,23 +158,30 @@
   function runFilter() {
     if (!filteringEnabled) {
       restoreAll();
+      removeStatsBox();
       updateCounter(0);
       return;
     }
 
+    const stats = createStats();
     let hiddenCount = 0;
 
-    // 1. Filter top-level timeline items (.js-timeline-item)
+    // 1. Filter top-level timeline items
     const timelineItems = document.querySelectorAll(".js-timeline-item");
+    stats.totalItems = timelineItems.length;
+
     for (const item of timelineItems) {
       const author = getAuthorFromElement(item);
+      const noise = isNoiseItem(item);
 
-      if (isBlocked(author) || isNoiseItem(item)) {
+      if (isBlocked(author) || noise) {
         hideElement(item);
         hiddenCount++;
+        recordHidden(stats, author, noise && !isBlocked(author));
       } else {
         showElement(item);
-        // 2. Filter individual review threads inside non-blocked items
+        stats.visible++;
+        // Filter review threads inside non-blocked items
         const threads = item.querySelectorAll(
           ".js-resolvable-timeline-thread-container"
         );
@@ -173,6 +190,8 @@
           if (isBlocked(threadAuthor)) {
             hideElement(thread);
             hiddenCount++;
+            stats.threadsHidden++;
+            recordHidden(stats, threadAuthor, false);
           } else {
             showElement(thread);
           }
@@ -180,7 +199,7 @@
       }
     }
 
-    // 3. Filter standalone comment containers not inside timeline items
+    // 2. Filter standalone comment containers
     const standaloneComments = document.querySelectorAll(
       ".js-comment-container:not(.js-timeline-item .js-comment-container)"
     );
@@ -189,21 +208,27 @@
       if (isBlocked(author)) {
         hideElement(comment);
         hiddenCount++;
+        recordHidden(stats, author, false);
       } else {
         showElement(comment);
       }
     }
 
-    // 4. Filter review comments on the Files Changed tab
-    hiddenCount += filterFilesTabComments();
+    // 3. Filter Files Changed tab
+    hiddenCount += filterFilesTabComments(stats);
 
     updateCounter(hiddenCount);
+
+    if (showStats) {
+      renderStatsBox(stats, hiddenCount);
+    } else {
+      removeStatsBox();
+    }
   }
 
-  function filterFilesTabComments() {
+  function filterFilesTabComments(stats) {
     let count = 0;
 
-    // Classic view: .review-comment, .js-inline-comment-fragment
     const classicComments = document.querySelectorAll(
       ".review-comment, .js-inline-comment-fragment"
     );
@@ -212,14 +237,12 @@
       if (isBlocked(author)) {
         hideElement(comment);
         count++;
+        recordHidden(stats, author, false);
       } else {
         showElement(comment);
       }
     }
 
-    // React Files Changed view
-    // Each diff line with comments has an InlineMarkers wrapper containing
-    // InlineReviewThread containers. Author extracted from React fiber data.
     const markers = document.querySelectorAll(
       '[class*="InlineMarkers-module__markersWrapper"]'
     );
@@ -235,13 +258,14 @@
         if (isBlocked(author)) {
           hideElement(thread);
           count++;
+          stats.threadsHidden++;
+          recordHidden(stats, author, false);
         } else {
           showElement(thread);
           allBlocked = false;
         }
       }
 
-      // If all threads in this marker are blocked, hide the whole marker
       if (allBlocked) {
         hideElement(marker);
       } else {
@@ -251,6 +275,100 @@
 
     return count;
   }
+
+  // --- Stats box ---
+
+  function renderStatsBox(stats, hiddenCount) {
+    if (hiddenCount === 0) {
+      removeStatsBox();
+      return;
+    }
+
+    // Only render on PR conversation pages
+    const discussion = document.querySelector(".js-discussion");
+    if (!discussion) return;
+
+    let box = document.getElementById(STATS_ID);
+    if (!box) {
+      box = document.createElement("div");
+      box.id = STATS_ID;
+
+      // Insert after the first RAILS-PARTIAL (PR description) or at the top
+      const firstChild = discussion.firstElementChild;
+      if (firstChild?.nextElementSibling) {
+        firstChild.after(box);
+      } else {
+        discussion.prepend(box);
+      }
+    }
+
+    const isDark =
+      document.documentElement.getAttribute("data-color-mode") === "dark" ||
+      document.documentElement.getAttribute("data-dark-theme") != null;
+
+    const bg = isDark ? "#161b22" : "#f6f8fa";
+    const fg = isDark ? "#e6edf3" : "#1f2328";
+    const fgMuted = isDark ? "#8b949e" : "#656d76";
+    const border = isDark ? "#30363d" : "#d0d7de";
+    const accent = isDark ? "#58a6ff" : "#0969da";
+    const red = "#f85149";
+    const green = isDark ? "#3fb950" : "#1a7f37";
+
+    // Build per-user breakdown
+    const userEntries = Object.entries(stats.hiddenByUser)
+      .sort((a, b) => b[1] - a[1]);
+
+    const userRows = userEntries
+      .map(
+        ([user, count]) =>
+          `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;margin-bottom:4px;">` +
+          `<span style="color:${red};font-weight:600;">@${escapeHtml(user)}</span>` +
+          `<span style="color:${fgMuted};">${count}</span>` +
+          `</span>`
+      )
+      .join("");
+
+    const totalBlockedComments = userEntries.reduce((s, [, c]) => s + c, 0);
+
+    box.innerHTML =
+      `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;` +
+      `background:${bg};border:1px solid ${border};border-radius:6px;padding:12px 16px;margin:8px 0 16px 56px;">` +
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">` +
+      `<svg width="16" height="16" viewBox="0 0 16 16" fill="${accent}"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/></svg>` +
+      `<span style="font-weight:600;font-size:13px;color:${fg};">Persona Non Grata</span>` +
+      `<span style="font-size:12px;color:${fgMuted};">filtering summary</span>` +
+      `</div>` +
+      `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:${userRows ? "8px" : "0"};font-size:13px;">` +
+      `<span style="color:${fg};"><strong style="color:${red};">${hiddenCount}</strong> hidden</span>` +
+      `<span style="color:${fg};"><strong style="color:${green};">${stats.visible}</strong> visible</span>` +
+      (totalBlockedComments > 0
+        ? `<span style="color:${fgMuted};">${totalBlockedComments} from blocked users</span>`
+        : "") +
+      (stats.noiseHidden > 0
+        ? `<span style="color:${fgMuted};">${stats.noiseHidden} noise</span>`
+        : "") +
+      (stats.threadsHidden > 0
+        ? `<span style="color:${fgMuted};">${stats.threadsHidden} inline threads</span>`
+        : "") +
+      `</div>` +
+      (userRows
+        ? `<div style="display:flex;flex-wrap:wrap;font-size:12px;">${userRows}</div>`
+        : "") +
+      `</div>`;
+  }
+
+  function removeStatsBox() {
+    const box = document.getElementById(STATS_ID);
+    if (box) box.remove();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // --- Counter badge ---
 
   function restoreAll() {
     const hidden = document.querySelectorAll(`[${HIDDEN_ATTR}]`);
@@ -271,7 +389,6 @@
       counter = document.createElement("div");
       counter.id = COUNTER_ID;
 
-      // Detect GitHub theme
       const isDark =
         document.documentElement.getAttribute("data-color-mode") === "dark" ||
         document.documentElement.getAttribute("data-dark-theme") != null;
@@ -302,20 +419,25 @@
     counter.textContent = `PNG: ${count} hidden`;
   }
 
+  // --- Settings & Init ---
+
   async function loadSettings() {
     try {
       const {
         blockedUsers: users = [],
         filteringEnabled: enabled = true,
         hideNoise: noise = false,
+        showStats: statsOn = false,
       } = await chrome.storage.sync.get([
         "blockedUsers",
         "filteringEnabled",
         "hideNoise",
+        "showStats",
       ]);
       blockedUsers = users;
       filteringEnabled = enabled;
       hideNoise = noise;
+      showStats = statsOn;
     } catch (err) {
       console.warn("[Persona Non Grata] Failed to load settings:", err.message);
     }
@@ -325,7 +447,6 @@
     await loadSettings();
     filterTimeline();
 
-    // Re-filter when GitHub dynamically loads content (SPA navigation, lazy loading)
     let debounceTimer = null;
     const observer = new MutationObserver(() => {
       if (isFiltering) return;
@@ -339,12 +460,10 @@
     });
   }
 
-  // Single update path: storage changes (from popup, other tabs, or sync)
   chrome.storage.onChanged.addListener(() => {
     loadSettings().then(() => filterTimeline());
   });
 
-  // Handle GitHub SPA navigation (turbo/pjax)
   document.addEventListener("turbo:load", () => {
     loadSettings().then(() => filterTimeline());
   });
