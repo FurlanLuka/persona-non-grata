@@ -302,26 +302,26 @@
       }
     }
 
-    const isDark =
-      document.documentElement.getAttribute("data-color-mode") === "dark" ||
-      document.documentElement.getAttribute("data-dark-theme") != null;
+    // Use GitHub's CSS custom properties for native theme support
+    const cs = getComputedStyle(document.documentElement);
+    const v = (name) => cs.getPropertyValue(name).trim();
 
-    const bg = isDark ? "#161b22" : "#f6f8fa";
-    const fg = isDark ? "#e6edf3" : "#1f2328";
-    const fgMuted = isDark ? "#8b949e" : "#656d76";
-    const border = isDark ? "#30363d" : "#d0d7de";
-    const accent = isDark ? "#58a6ff" : "#0969da";
-    const red = "#f85149";
-    const green = isDark ? "#3fb950" : "#1a7f37";
+    const bg = v("--bgColor-muted") || "#f6f8fa";
+    const fg = v("--fgColor-default") || "#1f2328";
+    const fgMuted = v("--fgColor-muted") || "#656d76";
+    const borderColor = v("--borderColor-default") || "#d0d7de";
+    const accent = v("--fgColor-accent") || "#0969da";
+    const red = v("--fgColor-danger") || "#d1242f";
+    const green = v("--fgColor-success") || "#1a7f37";
 
-    // Build per-user breakdown
-    const userEntries = Object.entries(stats.hiddenByUser)
-      .sort((a, b) => b[1] - a[1]);
+    const userEntries = Object.entries(stats.hiddenByUser).sort(
+      (a, b) => b[1] - a[1]
+    );
 
     const userRows = userEntries
       .map(
         ([user, count]) =>
-          `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;margin-bottom:4px;">` +
+          `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;margin-bottom:2px;">` +
           `<span style="color:${red};font-weight:600;">@${escapeHtml(user)}</span>` +
           `<span style="color:${fgMuted};">${count}</span>` +
           `</span>`
@@ -330,31 +330,41 @@
 
     const totalBlockedComments = userEntries.reduce((s, [, c]) => s + c, 0);
 
+    const metaParts = [
+      totalBlockedComments > 0
+        ? `<span>${totalBlockedComments} from blocked users</span>`
+        : "",
+      stats.noiseHidden > 0 ? `<span>${stats.noiseHidden} noise</span>` : "",
+      stats.threadsHidden > 0
+        ? `<span>${stats.threadsHidden} inline threads</span>`
+        : "",
+    ]
+      .filter(Boolean)
+      .join('<span style="opacity:0.4;"> · </span>');
+
+    // Match the timeline layout: same left margin as timeline comment boxes
     box.innerHTML =
-      `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;` +
-      `background:${bg};border:1px solid ${border};border-radius:6px;padding:12px 16px;margin:8px 0 16px 56px;">` +
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">` +
+      `<div class="TimelineItem" style="padding:0;margin:0 0 16px;">` +
+      `<div class="TimelineItem-body my-0" style="` +
+      `background:${bg};border:1px solid ${borderColor};border-radius:6px;padding:12px 16px;` +
+      `font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">` +
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">` +
       `<svg width="16" height="16" viewBox="0 0 16 16" fill="${accent}"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm7-3.25v2.992l2.028.812a.75.75 0 0 1-.557 1.392l-2.5-1A.751.751 0 0 1 7 8.25v-3.5a.75.75 0 0 1 1.5 0Z"/></svg>` +
       `<span style="font-weight:600;font-size:13px;color:${fg};">Persona Non Grata</span>` +
       `<span style="font-size:12px;color:${fgMuted};">filtering summary</span>` +
       `</div>` +
-      `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:${userRows ? "8px" : "0"};font-size:13px;">` +
-      `<span style="color:${fg};"><strong style="color:${red};">${hiddenCount}</strong> hidden</span>` +
-      `<span style="color:${fg};"><strong style="color:${green};">${stats.visible}</strong> visible</span>` +
-      (totalBlockedComments > 0
-        ? `<span style="color:${fgMuted};">${totalBlockedComments} from blocked users</span>`
-        : "") +
-      (stats.noiseHidden > 0
-        ? `<span style="color:${fgMuted};">${stats.noiseHidden} noise</span>`
-        : "") +
-      (stats.threadsHidden > 0
-        ? `<span style="color:${fgMuted};">${stats.threadsHidden} inline threads</span>`
-        : "") +
+      `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:${fg};` +
+      `${userRows || metaParts ? "margin-bottom:6px;" : ""}">` +
+      `<span><strong style="color:${red};">${hiddenCount}</strong> hidden</span>` +
+      `<span><strong style="color:${green};">${stats.visible}</strong> visible</span>` +
       `</div>` +
+      (metaParts
+        ? `<div style="font-size:12px;color:${fgMuted};${userRows ? "margin-bottom:6px;" : ""}">${metaParts}</div>`
+        : "") +
       (userRows
         ? `<div style="display:flex;flex-wrap:wrap;font-size:12px;">${userRows}</div>`
         : "") +
-      `</div>`;
+      `</div></div>`;
   }
 
   function removeStatsBox() {
@@ -389,12 +399,11 @@
       counter = document.createElement("div");
       counter.id = COUNTER_ID;
 
-      const isDark =
-        document.documentElement.getAttribute("data-color-mode") === "dark" ||
-        document.documentElement.getAttribute("data-dark-theme") != null;
-      const bg = isDark ? "#1f2328" : "#ffffff";
-      const fg = isDark ? "#e6edf3" : "#1f2328";
-      const border = isDark ? "#30363d" : "#d0d7de";
+      const cs = getComputedStyle(document.documentElement);
+      const bg = cs.getPropertyValue("--bgColor-default").trim() || "#ffffff";
+      const fg = cs.getPropertyValue("--fgColor-default").trim() || "#1f2328";
+      const border =
+        cs.getPropertyValue("--borderColor-default").trim() || "#d0d7de";
 
       Object.assign(counter.style, {
         position: "fixed",
