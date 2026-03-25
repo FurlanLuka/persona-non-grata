@@ -346,33 +346,46 @@
     }
   }
 
-  async function init() {
-    await loadSettings();
-    filterTimeline();
+  let debounceTimer = null;
+  let observer = null;
 
-    let debounceTimer = null;
-    const observer = new MutationObserver(() => {
+  function startObserver() {
+    if (observer) observer.disconnect();
+    observer = new MutationObserver(() => {
       if (isFiltering) return;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(filterTimeline, 200);
     });
-
     observer.observe(document.body, {
       childList: true,
       subtree: true,
     });
   }
 
+  async function init() {
+    await loadSettings();
+    filterTimeline();
+    startObserver();
+  }
+
   chrome.storage.onChanged.addListener(() => {
     loadSettings().then(() => filterTimeline());
   });
 
+  // GitHub SPA navigation replaces document.body, which disconnects
+  // the MutationObserver. Re-attach it after each navigation.
   document.addEventListener("turbo:load", () => {
-    loadSettings().then(() => filterTimeline());
+    loadSettings().then(() => {
+      filterTimeline();
+      startObserver();
+    });
   });
 
   document.addEventListener("pjax:end", () => {
-    loadSettings().then(() => filterTimeline());
+    loadSettings().then(() => {
+      filterTimeline();
+      startObserver();
+    });
   });
 
   init();
