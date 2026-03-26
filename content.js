@@ -38,35 +38,51 @@
     return blockedUsers.includes(username.toLowerCase());
   }
 
+  // Cache noise results per element to avoid re-evaluation after hiding.
+  // textContent doesn't change when display:none, but we cache anyway
+  // to avoid any edge cases and improve performance.
+  const noiseCache = new WeakMap();
+
   function isNoiseItem(item) {
     if (!hideNoise) return false;
 
-    // Keep anything with real review/comment content
-    const hasCommentBody = !!item.querySelector(
-      ".timeline-comment, .js-comment-container .comment-body"
-    );
-    const hasReviewThreads =
-      item.querySelectorAll(".js-resolvable-timeline-thread-container").length >
-      0;
-    if (hasCommentBody || hasReviewThreads) return false;
+    if (noiseCache.has(item)) return noiseCache.get(item);
 
-    // Keep reviews (eye icon) and approvals (check icon)
-    if (item.querySelector(".octicon-eye")) return false;
-    if (item.querySelector(".octicon-check")) return false;
-    if (item.querySelector(".octicon-file-diff")) return false;
+    const result = checkNoise(item);
+    noiseCache.set(item, result);
+    return result;
+  }
 
-    // Hide specific noise types by their icons
-    if (item.querySelector(".octicon-git-commit")) return true;
-    if (item.querySelector(".octicon-repo-push")) return true;
-    if (item.querySelector(".octicon-git-branch")) return true;
-    if (item.querySelector(".octicon-pencil")) return true;
-    if (item.querySelector(".octicon-cross-reference")) return true;
-    if (item.querySelector(".octicon-tag")) return true;
-    if (item.querySelector(".octicon-git-pull-request-draft")) return true;
-    if (item.querySelector(".octicon-skip")) return true;
+  function checkNoise(item) {
+    const text = item.textContent || "";
+    const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
-    // Condensed timeline items without comment content are status events
-    if (item.querySelector(".TimelineItem--condensed")) return true;
+    if (hasCommitIcon) return true;
+    if (text.includes("marked this pull request as")) return true;
+    if (text.includes("changed the title")) return true;
+    if (text.includes("mentioned this pull request")) return true;
+    if (text.includes("force-pushed")) return true;
+
+    if (
+      text.includes("requested review from") &&
+      !text.includes("approved") &&
+      !text.includes("requested changes")
+    ) {
+      const hasReviewContent = !!item.querySelector(
+        ".js-comment-container .timeline-comment"
+      );
+      if (!hasReviewContent) return true;
+    }
+
+    if (text.includes("changed the base branch")) return true;
+
+    if (
+      text.includes("This comment was marked as resolved") &&
+      text.includes("Show comment") &&
+      !text.includes("reviewed")
+    ) {
+      return true;
+    }
 
     return false;
   }
