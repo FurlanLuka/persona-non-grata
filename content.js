@@ -38,39 +38,36 @@
     return blockedUsers.includes(username.toLowerCase());
   }
 
+  const noiseCache = new WeakMap();
+
   function isNoiseItem(item) {
     if (!hideNoise) return false;
+    if (noiseCache.has(item)) return noiseCache.get(item);
 
     const text = item.innerText?.substring(0, 300)?.trim() || "";
     const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
-    if (hasCommitIcon) return true;
-    if (text.includes("marked this pull request as")) return true;
-    if (text.includes("changed the title")) return true;
-    if (text.includes("mentioned this pull request")) return true;
+    let result = false;
 
-    if (
+    if (hasCommitIcon) result = true;
+    else if (text.includes("marked this pull request as")) result = true;
+    else if (text.includes("changed the title")) result = true;
+    else if (text.includes("mentioned this pull request")) result = true;
+    else if (
       text.includes("requested review from") &&
       !text.includes("approved") &&
-      !text.includes("requested changes")
-    ) {
-      const hasReviewContent = !!item.querySelector(
-        ".js-comment-container .timeline-comment"
-      );
-      if (!hasReviewContent) return true;
-    }
-
-    if (text.includes("changed the base branch")) return true;
-
-    if (
+      !text.includes("requested changes") &&
+      !item.querySelector(".js-comment-container .timeline-comment")
+    ) result = true;
+    else if (text.includes("changed the base branch")) result = true;
+    else if (
       text.includes("This comment was marked as resolved") &&
       text.includes("Show comment") &&
       !text.includes("reviewed")
-    ) {
-      return true;
-    }
+    ) result = true;
 
-    return false;
+    noiseCache.set(item, result);
+    return result;
   }
 
   // --- Stats ---
