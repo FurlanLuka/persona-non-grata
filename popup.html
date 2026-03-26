@@ -25,7 +25,11 @@
     <ul id="user-list"></ul>
 
     <div id="empty-state" class="empty-state">
-      No users blocked yet. Add a GitHub username above.
+      No users blocked yet.
+      <div id="suggestions" class="suggestions">
+        <p>Quick add popular bots:</p>
+        <div class="suggestion-chips"></div>
+      </div>
     </div>
 
     <div class="footer">
@@ -43,7 +47,6 @@
           <span>Show stats summary</span>
         </label>
       </div>
-      <button id="refresh-btn" class="btn-secondary" title="Re-filter current tab">Refresh</button>
     </div>
   </div>
 

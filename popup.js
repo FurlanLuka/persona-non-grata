@@ -2,6 +2,12 @@
 
 const USERNAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/i;
 const MAX_BLOCKED_USERS = 200;
+const SUGGESTED_BOTS = [
+  "coderabbitai",
+  "copilot",
+  "chatgpt-codex-connector",
+  "devin-ai-integration",
+];
 
 const usernameInput = document.getElementById("username-input");
 const addForm = document.getElementById("add-form");
@@ -10,8 +16,8 @@ const emptyState = document.getElementById("empty-state");
 const enabledToggle = document.getElementById("enabled-toggle");
 const noiseToggle = document.getElementById("noise-toggle");
 const statsToggle = document.getElementById("stats-toggle");
-const refreshBtn = document.getElementById("refresh-btn");
 const errorMsg = document.getElementById("error-msg");
+const suggestionsContainer = document.querySelector(".suggestion-chips");
 
 function render(usernames) {
   userList.innerHTML = "";
@@ -32,6 +38,27 @@ function render(usernames) {
     li.append(span, removeBtn);
     userList.appendChild(li);
   }
+
+  renderSuggestions(usernames);
+}
+
+function renderSuggestions(currentUsers) {
+  suggestionsContainer.innerHTML = "";
+  const available = SUGGESTED_BOTS.filter((b) => !currentUsers.includes(b));
+
+  if (available.length === 0) {
+    document.getElementById("suggestions").style.display = "none";
+    return;
+  }
+  document.getElementById("suggestions").style.display = "";
+
+  for (const bot of available) {
+    const chip = document.createElement("button");
+    chip.className = "suggestion-chip";
+    chip.textContent = `+ ${bot}`;
+    chip.addEventListener("click", () => addUser(bot));
+    suggestionsContainer.appendChild(chip);
+  }
 }
 
 function showError(msg) {
@@ -43,13 +70,17 @@ function showError(msg) {
 }
 
 async function loadState() {
-  const { blockedUsers = [], filteringEnabled = true, hideNoise = false, showStats = false } =
-    await chrome.storage.sync.get([
-      "blockedUsers",
-      "filteringEnabled",
-      "hideNoise",
-      "showStats",
-    ]);
+  const {
+    blockedUsers = [],
+    filteringEnabled = true,
+    hideNoise = false,
+    showStats = false,
+  } = await chrome.storage.sync.get([
+    "blockedUsers",
+    "filteringEnabled",
+    "hideNoise",
+    "showStats",
+  ]);
   render(blockedUsers);
   enabledToggle.checked = filteringEnabled;
   noiseToggle.checked = hideNoise;
@@ -89,12 +120,6 @@ async function removeUser(username) {
   render(updated);
 }
 
-async function triggerRefresh() {
-  // Touch storage to trigger the content script's storage.onChanged listener
-  const { filteringEnabled = true } = await chrome.storage.sync.get("filteringEnabled");
-  await chrome.storage.sync.set({ filteringEnabled });
-}
-
 addForm.addEventListener("submit", (e) => {
   e.preventDefault();
   addUser(usernameInput.value);
@@ -112,10 +137,6 @@ noiseToggle.addEventListener("change", async () => {
 
 statsToggle.addEventListener("change", async () => {
   await chrome.storage.sync.set({ showStats: statsToggle.checked });
-});
-
-refreshBtn.addEventListener("click", () => {
-  triggerRefresh();
 });
 
 loadState();

@@ -130,6 +130,37 @@ h1 {
   padding: 20px 0;
 }
 
+.suggestions {
+  margin-top: 10px;
+}
+
+.suggestions p {
+  margin-bottom: 6px;
+  color: #8b949e;
+}
+
+.suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.suggestion-chip {
+  padding: 3px 10px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.suggestion-chip:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+}
+
 .footer {
   display: flex;
   align-items: center;
@@ -160,16 +191,3 @@ h1 {
   height: 14px;
 }
 
-.btn-secondary {
-  padding: 4px 10px;
-  background: #21262d;
-  color: #c9d1d9;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn-secondary:hover {
-  background: #30363d;
-}
