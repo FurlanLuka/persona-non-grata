@@ -41,37 +41,47 @@
   function isNoiseItem(item) {
     if (!hideNoise) return false;
 
-    // Use textContent (not innerText) — innerText returns "" for display:none elements,
-    // which would cause a show/hide loop with the MutationObserver.
-    const text = item.textContent || "";
-    const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
+    // Detect by DOM structure — not text matching — to avoid false positives
+    // and show/hide loops.
 
-    if (hasCommitIcon) return true;
-    if (text.includes("marked this pull request as")) return true;
-    if (text.includes("changed the title")) return true;
-    if (text.includes("mentioned this pull request")) return true;
-    if (text.includes("force-pushed")) return true;
+    // Commits (individual or grouped)
+    if (item.querySelector(".octicon-git-commit")) return true;
 
-    if (
-      text.includes("requested review from") &&
-      !text.includes("approved") &&
-      !text.includes("requested changes")
-    ) {
-      const hasReviewContent = !!item.querySelector(
-        ".js-comment-container .timeline-comment"
-      );
-      if (!hasReviewContent) return true;
-    }
+    // Force pushes
+    if (item.querySelector(".octicon-repo-push")) return true;
 
-    if (text.includes("changed the base branch")) return true;
+    // Items with no comment body are status events (draft toggle, title change,
+    // review requests, branch changes, cross-references, etc.)
+    // Keep items that have actual review/comment content.
+    const hasCommentBody = !!item.querySelector(
+      ".timeline-comment, .js-comment-container .comment-body"
+    );
+    const hasReviewThreads = item.querySelectorAll(
+      ".js-resolvable-timeline-thread-container"
+    ).length > 0;
+    const isApproval =
+      !!item.querySelector(".octicon-check") ||
+      !!item.querySelector(".octicon-file-diff");
 
-    if (
-      text.includes("This comment was marked as resolved") &&
-      text.includes("Show comment") &&
-      !text.includes("reviewed")
-    ) {
-      return true;
-    }
+    // If it has a comment body, review threads, or is an approval — keep it
+    if (hasCommentBody || hasReviewThreads || isApproval) return false;
+
+    // Everything else without comment content is noise
+    // (title changes, draft toggles, review requests, branch changes,
+    //  cross-references, resolved placeholders, label changes, etc.)
+    const hasAuthor = !!item.querySelector("a.author");
+    const isCondensed = !!item.querySelector(".TimelineItem--condensed");
+
+    // Condensed items without comments are always noise
+    if (isCondensed) return true;
+
+    // Non-condensed items without any comment body — check if it's a
+    // review event (has the eye icon = "reviewed") which we want to keep
+    const hasEyeIcon = !!item.querySelector(".octicon-eye");
+    if (hasEyeIcon) return false;
+
+    // Remaining items without comment content are noise
+    if (hasAuthor && !hasCommentBody) return true;
 
     return false;
   }
