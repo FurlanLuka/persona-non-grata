@@ -41,13 +41,16 @@
   function isNoiseItem(item) {
     if (!hideNoise) return false;
 
-    const text = item.innerText?.substring(0, 300)?.trim() || "";
+    // Use textContent (not innerText) — innerText returns "" for display:none elements,
+    // which would cause a show/hide loop with the MutationObserver.
+    const text = item.textContent?.substring(0, 500)?.trim() || "";
     const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
     if (hasCommitIcon) return true;
     if (text.includes("marked this pull request as")) return true;
     if (text.includes("changed the title")) return true;
     if (text.includes("mentioned this pull request")) return true;
+    if (text.includes("force-pushed")) return true;
 
     if (
       text.includes("requested review from") &&
