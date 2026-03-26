@@ -111,10 +111,15 @@
   function filterTimeline() {
     if (isFiltering) return;
     isFiltering = true;
+    // Disconnect observer so our own DOM changes don't retrigger filtering
+    if (observer) observer.disconnect();
     try {
       runFilter();
     } finally {
       isFiltering = false;
+      if (observer) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
     }
   }
 
