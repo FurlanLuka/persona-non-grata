@@ -38,30 +38,16 @@
     return blockedUsers.includes(username.toLowerCase());
   }
 
-  // Cache noise results per element to avoid re-evaluation after hiding.
-  // textContent doesn't change when display:none, but we cache anyway
-  // to avoid any edge cases and improve performance.
-  const noiseCache = new WeakMap();
-
   function isNoiseItem(item) {
     if (!hideNoise) return false;
 
-    if (noiseCache.has(item)) return noiseCache.get(item);
-
-    const result = checkNoise(item);
-    noiseCache.set(item, result);
-    return result;
-  }
-
-  function checkNoise(item) {
-    const text = item.textContent || "";
+    const text = item.innerText?.substring(0, 300)?.trim() || "";
     const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
     if (hasCommitIcon) return true;
     if (text.includes("marked this pull request as")) return true;
     if (text.includes("changed the title")) return true;
     if (text.includes("mentioned this pull request")) return true;
-    if (text.includes("force-pushed")) return true;
 
     if (
       text.includes("requested review from") &&
@@ -112,15 +98,10 @@
   function filterTimeline() {
     if (isFiltering) return;
     isFiltering = true;
-    // Disconnect observer so our own DOM changes don't retrigger filtering
-    if (observer) observer.disconnect();
     try {
       runFilter();
     } finally {
       isFiltering = false;
-      if (observer) {
-        observer.observe(document.body, { childList: true, subtree: true });
-      }
     }
   }
 
