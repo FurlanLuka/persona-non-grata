@@ -43,7 +43,7 @@
 
     // Use textContent (not innerText) — innerText returns "" for display:none elements,
     // which would cause a show/hide loop with the MutationObserver.
-    const text = item.textContent?.substring(0, 500)?.trim() || "";
+    const text = item.textContent || "";
     const hasCommitIcon = !!item.querySelector(".octicon-git-commit");
 
     if (hasCommitIcon) return true;
