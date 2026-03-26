@@ -41,47 +41,32 @@
   function isNoiseItem(item) {
     if (!hideNoise) return false;
 
-    // Detect by DOM structure — not text matching — to avoid false positives
-    // and show/hide loops.
-
-    // Commits (individual or grouped)
-    if (item.querySelector(".octicon-git-commit")) return true;
-
-    // Force pushes
-    if (item.querySelector(".octicon-repo-push")) return true;
-
-    // Items with no comment body are status events (draft toggle, title change,
-    // review requests, branch changes, cross-references, etc.)
-    // Keep items that have actual review/comment content.
+    // Keep anything with real review/comment content
     const hasCommentBody = !!item.querySelector(
       ".timeline-comment, .js-comment-container .comment-body"
     );
-    const hasReviewThreads = item.querySelectorAll(
-      ".js-resolvable-timeline-thread-container"
-    ).length > 0;
-    const isApproval =
-      !!item.querySelector(".octicon-check") ||
-      !!item.querySelector(".octicon-file-diff");
+    const hasReviewThreads =
+      item.querySelectorAll(".js-resolvable-timeline-thread-container").length >
+      0;
+    if (hasCommentBody || hasReviewThreads) return false;
 
-    // If it has a comment body, review threads, or is an approval — keep it
-    if (hasCommentBody || hasReviewThreads || isApproval) return false;
+    // Keep reviews (eye icon) and approvals (check icon)
+    if (item.querySelector(".octicon-eye")) return false;
+    if (item.querySelector(".octicon-check")) return false;
+    if (item.querySelector(".octicon-file-diff")) return false;
 
-    // Everything else without comment content is noise
-    // (title changes, draft toggles, review requests, branch changes,
-    //  cross-references, resolved placeholders, label changes, etc.)
-    const hasAuthor = !!item.querySelector("a.author");
-    const isCondensed = !!item.querySelector(".TimelineItem--condensed");
+    // Hide specific noise types by their icons
+    if (item.querySelector(".octicon-git-commit")) return true;
+    if (item.querySelector(".octicon-repo-push")) return true;
+    if (item.querySelector(".octicon-git-branch")) return true;
+    if (item.querySelector(".octicon-pencil")) return true;
+    if (item.querySelector(".octicon-cross-reference")) return true;
+    if (item.querySelector(".octicon-tag")) return true;
+    if (item.querySelector(".octicon-git-pull-request-draft")) return true;
+    if (item.querySelector(".octicon-skip")) return true;
 
-    // Condensed items without comments are always noise
-    if (isCondensed) return true;
-
-    // Non-condensed items without any comment body — check if it's a
-    // review event (has the eye icon = "reviewed") which we want to keep
-    const hasEyeIcon = !!item.querySelector(".octicon-eye");
-    if (hasEyeIcon) return false;
-
-    // Remaining items without comment content are noise
-    if (hasAuthor && !hasCommentBody) return true;
+    // Condensed timeline items without comment content are status events
+    if (item.querySelector(".TimelineItem--condensed")) return true;
 
     return false;
   }
