@@ -7,6 +7,7 @@ const SUGGESTED_BOTS = [
   "copilot",
   "chatgpt-codex-connector",
   "devin-ai-integration",
+  "sentry",
 ];
 
 const usernameInput = document.getElementById("username-input");
